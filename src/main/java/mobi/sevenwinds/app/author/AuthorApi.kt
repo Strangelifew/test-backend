@@ -13,14 +13,14 @@ fun NormalOpenAPIRoute.author() {
         // рекомендуют не использовать глаголы в url, так как url определяет ресурс, а оперция с ресурсом определяется
         // http методом. Принял решение сделать url в соответствии с лучшими практиками REST, хотя это и делает api не
         // единообразным.
-        post<Unit, Int, AuthorRecord>(info("Добавить запись")) { _, body ->
+        post<Unit, Int, AddAuthorRequest>(info("Добавить запись")) { _, body ->
             respond(AuthorService.addRecord(body))
         }
         "".toRegex()
     }
 }
 
-data class AuthorRecord(
+data class AddAuthorRequest(
     // На самом деле русское ФИО проверяется более сложной регуляркой, но для простоты считал, что корректное ФИО это
     // просто строка из трех слов, где слово - непустая последовательность непробельных символов
     @RegularExpression("[\\S]+ [\\S]+ [\\S]+") val fullName: String

@@ -22,7 +22,7 @@ class AuthorApiKtTest : ServerTest() {
     fun testAddRecordSuccess() {
         val fullName = "Харитонова Ульяна Яковлевна"
         RestAssured.given()
-            .jsonBody(AuthorRecord(fullName))
+            .jsonBody(AddAuthorRequest(fullName))
             .post("/author")
             .then()
             .statusCode(HttpStatusCode.OK.value)
@@ -35,7 +35,7 @@ class AuthorApiKtTest : ServerTest() {
     fun testInvalidFullName() {
         val invalidFullName = "Харитонова Ульяна"
         RestAssured.given()
-            .jsonBody(AuthorRecord(invalidFullName))
+            .jsonBody(AddAuthorRequest(invalidFullName))
             .post("/author")
             .then()
             .statusCode(HttpStatusCode.BadRequest.value)

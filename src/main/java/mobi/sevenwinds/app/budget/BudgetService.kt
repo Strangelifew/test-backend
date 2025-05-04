@@ -1,7 +1,10 @@
 package mobi.sevenwinds.app.budget
 
+import io.ktor.features.*
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
+import mobi.sevenwinds.app.author.AuthorEntity
+import mobi.sevenwinds.app.author.AuthorTable
 import org.jetbrains.exposed.sql.SortOrder.ASC
 import org.jetbrains.exposed.sql.SortOrder.DESC
 import org.jetbrains.exposed.sql.count
@@ -10,13 +13,22 @@ import org.jetbrains.exposed.sql.sum
 import org.jetbrains.exposed.sql.transactions.transaction
 
 object BudgetService {
-    suspend fun addRecord(body: BudgetRecord): BudgetRecord = withContext(Dispatchers.IO) {
+    suspend fun addRecord(body: BudgetRequest): BudgetResponse = withContext(Dispatchers.IO) {
         transaction {
             val entity = BudgetEntity.new {
-                this.year = body.year
-                this.month = body.month
-                this.amount = body.amount
-                this.type = body.type
+                year = body.year
+                month = body.month
+                amount = body.amount
+                type = body.type
+                author = body
+                    .authorId
+                    ?.let {
+                        AuthorTable
+                            .select { AuthorTable.id eq it }
+                            .firstOrNull()
+                            ?: throw NotFoundException("Author with id=$it is not found")
+                    }
+                    ?.let { AuthorEntity.wrapRow(it) }
             }
 
             return@transaction entity.toResponse()
