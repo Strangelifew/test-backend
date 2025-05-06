@@ -18,7 +18,7 @@ import org.joda.time.DateTime
 
 fun NormalOpenAPIRoute.budget() {
     route("/budget") {
-        route("/add").post<Unit, BudgetResponse, BudgetRequest>(info("Добавить запись")) { param, body ->
+        route("/add").post<Unit, BudgetResponse, BudgetRequest>(info("Добавить запись")) { _, body ->
             respond(BudgetService.addRecord(body))
         }
 
@@ -66,6 +66,7 @@ data class AuthorResponse(
     val creationDate: DateTime
 )
 
+@Suppress("NonAsciiCharacters", "EnumEntryName")
 enum class BudgetType {
     Приход, Расход
 }
