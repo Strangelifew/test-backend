@@ -5,11 +5,9 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import mobi.sevenwinds.app.author.AuthorEntity
 import mobi.sevenwinds.app.author.AuthorTable
+import org.jetbrains.exposed.sql.*
 import org.jetbrains.exposed.sql.SortOrder.ASC
 import org.jetbrains.exposed.sql.SortOrder.DESC
-import org.jetbrains.exposed.sql.count
-import org.jetbrains.exposed.sql.select
-import org.jetbrains.exposed.sql.sum
 import org.jetbrains.exposed.sql.transactions.transaction
 
 object BudgetService {
@@ -40,9 +38,29 @@ object BudgetService {
             var total = 0
             val sumByType = mutableMapOf<String, Int>()
 
-            BudgetTable
-                .slice(BudgetTable.amount.count(), BudgetTable.amount.sum(), BudgetTable.type)
-                .select { BudgetTable.year eq param.year }
+            val query: Query
+            val totalsQuery: Query
+            if (param.namePattern != null) {
+                val filter: SqlExpressionBuilder.() -> Op<Boolean> = {
+                    BudgetTable.year eq param.year and
+                            (BudgetTable.author eq AuthorTable.id) and
+                            (AuthorTable.fullName.lowerCase() match "%${param.namePattern.toLowerCase()}%")
+                }
+                query = (BudgetTable innerJoin AuthorTable)
+                    .select(filter)
+                totalsQuery = (BudgetTable innerJoin AuthorTable)
+                    .slice(BudgetTable.amount.count(), BudgetTable.amount.sum(), BudgetTable.type)
+                    .select(filter)
+            } else {
+                val filter: SqlExpressionBuilder.() -> Op<Boolean> = { BudgetTable.year eq param.year }
+                query = BudgetTable
+                    .select(filter)
+                totalsQuery = BudgetTable
+                    .slice(BudgetTable.amount.count(), BudgetTable.amount.sum(), BudgetTable.type)
+                    .select(filter)
+            }
+
+            totalsQuery
                 .groupBy(BudgetTable.type)
                 .forEach {
                     total += it[BudgetTable.amount.count()]
@@ -50,12 +68,12 @@ object BudgetService {
                     sumByType[key] = (sumByType[key] ?: 0) + (it[BudgetTable.amount.sum()] ?: 0)
                 }
 
-            val query = BudgetTable
-                .select { BudgetTable.year eq param.year }
-                .orderBy(BudgetTable.month to ASC, BudgetTable.amount to DESC)
-                .limit(param.limit, param.offset)
 
-            val data = BudgetEntity.wrapRows(query).map { it.toResponse() }
+            val data = BudgetEntity.wrapRows(
+                query
+                    .orderBy(BudgetTable.month to ASC, BudgetTable.amount to DESC)
+                    .limit(param.limit, param.offset)
+            ).map { it.toResponse() }
 
             return@transaction BudgetYearStatsResponse(
                 total = total,

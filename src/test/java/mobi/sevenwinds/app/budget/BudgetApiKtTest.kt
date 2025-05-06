@@ -14,6 +14,9 @@ import org.junit.jupiter.api.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertNotNull
 
+private const val fullName1 = "Харитонова Ульяна Яковлевна"
+private const val fullName2 = "Харлампиев Устиний Ильич"
+
 class BudgetApiKtTest : ServerTest() {
 
     @BeforeEach
@@ -81,9 +84,8 @@ class BudgetApiKtTest : ServerTest() {
 
     @Test
     fun testAddAuthoredBudgetSuccess() {
-        val fullName = "Харитонова Ульяна Яковлевна"
         val authorId = RestAssured.given()
-            .jsonBody(AddAuthorRequest(fullName))
+            .jsonBody(AddAuthorRequest(fullName1))
             .post("/author")
             .toResponse<Int>()
         val request = BudgetRequest(2020, 5, 100, BudgetType.Приход, authorId)
@@ -96,7 +98,7 @@ class BudgetApiKtTest : ServerTest() {
                 val budget = response.items.first()
                 assertEquals(request, budget.toRequest(authorId))
                 assertNotNull(budget.author)
-                assertEquals(fullName, budget.author?.fullName)
+                assertEquals(fullName1, budget.author?.fullName)
             }
     }
 
@@ -115,13 +117,81 @@ class BudgetApiKtTest : ServerTest() {
             }
     }
 
+    @Test
+    fun testGetBudgetStatsWithFilterAuthor_TwoAuthorsFit() {
+        prepareAuthorsStatsPlayground()
+
+        RestAssured.given()
+            .get("/budget/year/2020/stats?limit=100&offset=0&fullName=Хар")
+            .toResponse<BudgetYearStatsResponse>().let { response ->
+                println("${response.total} / ${response.items} / ${response.totalByType}")
+
+                assertEquals(6, response.total)
+                assertEquals(6, response.items.size)
+                assertEquals(160, response.totalByType[BudgetType.Приход.name])
+                assertEquals(170, response.totalByType[BudgetType.Расход.name])
+            }
+    }
+
+    @Test
+    fun testGetBudgetStatsWithFilterAuthor_OneAuthorFit() {
+        prepareAuthorsStatsPlayground()
+
+        RestAssured.given()
+            .get("/budget/year/2020/stats?limit=100&offset=0&fullName= Улья")
+            .toResponse<BudgetYearStatsResponse>().let { response ->
+                println("${response.total} / ${response.items} / ${response.totalByType}")
+
+                assertEquals(3, response.total)
+                assertEquals(3, response.items.size)
+                assertEquals(110, response.totalByType[BudgetType.Приход.name])
+                assertEquals(50, response.totalByType[BudgetType.Расход.name])
+            }
+    }
+
+    @Test
+    fun testGetBudgetStatsWithFilterAuthor_NoOneAuthorFit() {
+        prepareAuthorsStatsPlayground()
+
+        RestAssured.given()
+            .get("/budget/year/2020/stats?limit=100&offset=0&fullName= Улья ")
+            .toResponse<BudgetYearStatsResponse>().let { response ->
+                println("${response.total} / ${response.items} / ${response.totalByType}")
+
+                assertEquals(0, response.total)
+                assertEquals(0, response.items.size)
+            }
+    }
+
     private fun addRecord(request: BudgetRequest) {
         RestAssured.given()
             .jsonBody(request)
             .post("/budget/add")
             .toResponse<BudgetResponse>().let { response ->
-                Assert.assertEquals(request, response.toRequest(request.authorId))
+                assertEquals(request, response.toRequest(request.authorId))
             }
+    }
+
+    private fun prepareAuthorsStatsPlayground() {
+        fun addAuthor(fullName: String) = RestAssured.given()
+            .jsonBody(AddAuthorRequest(fullName))
+            .post("/author")
+            .toResponse<Int>()
+
+        val authorId1 = addAuthor(fullName1)
+        val authorId2 = addAuthor(fullName2)
+
+        addRecord(BudgetRequest(2020, 5, 10, BudgetType.Приход, authorId1))
+        addRecord(BudgetRequest(2020, 5, 100, BudgetType.Приход, authorId1))
+        addRecord(BudgetRequest(2020, 5, 50, BudgetType.Расход, authorId1))
+
+        addRecord(BudgetRequest(2020, 5, 100, BudgetType.Расход, authorId2))
+        addRecord(BudgetRequest(2020, 5, 50, BudgetType.Приход, authorId2))
+        addRecord(BudgetRequest(2020, 5, 20, BudgetType.Расход, authorId2))
+
+        addRecord(BudgetRequest(2020, 5, 100, BudgetType.Приход))
+        addRecord(BudgetRequest(2020, 5, 50, BudgetType.Приход))
+        addRecord(BudgetRequest(2020, 5, 20, BudgetType.Приход))
     }
 
     private fun BudgetResponse.toRequest(authorId: Int?) = BudgetRequest(
